@@ -1,0 +1,43 @@
+{# 找到所有实现了 AutoDataToModel 的类型 #}
+{% for type in types.implementing.AutoDataToModel %}
+{# 为该类型 type 创建 extension #}
+extension {{ type.name }} {
+    static func serialization(_ dic: [String : Any]) -> {{ type.name }}{
+        {% if type.kind == "struct" %}
+     	var object = {{ type.name }}()
+        {% else %}
+     	let object = {{ type.name }}()
+        {% endif %}
+     	{# 对类型中的所有存储属性迭代 #}
+     	{% for var in type.storedVariables %}
+     	{% if var.isArray %}
+     	{% if var.typeName.array.elementType.kind == "class" %}
+     	if let arr = dic["{{var.name}}"] as? [[String : Any]] {
+     		object.{{var.name}} = arr.map { {{var.typeName.array.elementTypeName}}.serialization( $0 ) }
+     	}
+     	{% elif var.typeName.array.elementType.kind == "struct" %}
+     	if let arr = dic["{{var.name}}"] as? [[String : Any]] {
+     		object.{{var.name}} = arr.map { {{var.typeName.array.elementTypeName}}.serialization( $0 ) }
+     	}
+     	{% else %}
+     	if let arr = dic["{{var.name}}"] as? [Any] {
+     		object.{{var.name}} = arr.map { {{var.typeName.array.elementTypeName}}.serialization( $0 ) }
+     	}
+     	{% endif %}
+     	{% elif var.type.kind == "class" %} {# 如果是自定义类或者结构体 #}
+     	if let map = dic["{{var.name}}"] as? [String : Any] {
+     		object.{{var.name}} = {{var.type.name}}.serialization(map)
+     	}
+     	{% elif var.type.kind == "struct" %}
+     	if let map = dic["{{var.name}}"] as? [String : Any] {
+     		object.{{var.name}} = {{var.type.name}}.serialization(map)
+     	}
+        {% elif var.isClosure %}
+     	{% else %}
+     	object.{{var.name}} = {{var.type.name}}.serialization(dic["{{var.name}}"])
+     	{% endif %}
+     	{% endfor %}
+     	return object
+    }
+}
+{% endfor %}
